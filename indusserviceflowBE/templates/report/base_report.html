@@ -1,0 +1,378 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}IndusServiceFlow Report{% endblock %}</title>
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /*
+    Palette is matched 1:1 to common/pdf_report.py + appointments/pdf_report.py
+    (the ReportLab-generated module reports) so every export -- ReportLab or
+    WeasyPrint -- shares one visual language.
+  */
+  :root {
+    --navy:#182a5c; --navy-dark:#0f1c40; --blue:#1565C0; --light-blue:#EAF0FE;
+    --teal:#16a394; --teal-dark:#0f8f83; --light-teal:#E6F8EF;
+    --orange:#f97316; --light-orange:#FDF3DF;
+    --red:#b3261e; --red-light:#FDEDED;
+    --purple:#5b3aa6; --light-purple:#F1ECFB;
+    --cyan:#0b6e8f; --light-cyan:#EAF6FB;
+    --grey-bg:#F0F1F3; --grey-line:#dfe4ec; --row-alt:#f4f7fb;
+    --white:#FFFFFF; --dark-text:#1f2937; --mid-text:#6b7280; --light-text:#94A3B8;
+    --green:#0f7a4d; --green-light:#E6F8EF;
+    --amber:#9a6a12; --yellow-light:#FDF3DF;
+  }
+
+  html { font-size: 10pt; }
+
+  body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: var(--dark-text);
+    background: #fff;
+    font-size: 9.5pt;
+    line-height: 1.5;
+  }
+
+  /* =========================
+     PAGE / PRINT SETUP
+     Both the slim strip (Printed On / Page N of Total / Confidential) and
+     the full branded block (logo, address, org line) live in ONE unified
+     bottom-center margin box, as two CSS running elements (position:
+     running()) stacked via flex + justify-content:flex-end so the group
+     always hugs the true bottom edge of the page.
+
+     .report-footer-strip is defined once, near the top of <body>. Running
+     elements carry forward automatically -- the same mechanism string-set
+     uses -- so once set it re-appears on every following page unaided;
+     this reproduces the ReportLab canvas's "_draw_footer_strip", which
+     draws on every page.
+
+     .report-footer-full is defined once, at the very end of the report
+     body/content. Carry-forward only ever looks *forward* from the page
+     where a running element is (re)defined -- so on every page BEFORE
+     that point it renders as nothing, and it only starts appearing from
+     the true final page onward. Since there's no page after that, it
+     shows up on -- and only on -- the last page, matching ReportLab's
+     "_draw_footer_full", which is only drawn on the true final page of
+     the buffered canvas. Because it's `position: running()`, it also
+     takes no space in normal flow, so it can never itself push content
+     onto an extra page.
+
+     The 36mm bottom margin is fixed across every page (CSS page margins
+     can't vary per-page based on content), sized to comfortably fit both
+     the full footer and the strip together on the last page. This costs a
+     little unused space in the bottom margin of non-final pages, which is
+     the trade-off for the footer always landing flush against the true
+     bottom edge with no dead gap above it.
+  ========================= */
+  @page {
+    size: A4 portrait;
+    margin: 12mm 0 36mm 0;
+
+    @bottom-center {
+      content: element(richfooter) element(stripline);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      width: 100%;
+    }
+  }
+
+  /* Page 1 keeps the navy header running flush to the physical top edge
+     (edge-to-edge banner look). The new 12mm top margin above only applies
+     from page 2 onward, where content would otherwise start right at the
+     top edge with no breathing room -- .page-content's own padding-top
+     only takes effect on the fragment where that box begins (page 1), not
+     on later continuation pages, so it can't supply this spacing itself. */
+  @page :first {
+    margin-top: 0;
+  }
+
+  .page-content { padding: 8mm 8mm 0 8mm; }
+
+  /* =========================
+     HEADER (first page only — normal flow, not repeated)
+  ========================= */
+  .report-header {
+    background: var(--navy);
+    padding: 5mm 8mm;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid var(--teal);
+  }
+
+  .header-logo-block { display: flex; align-items: center; gap: 10px; }
+  .header-logo-chip {
+    background: var(--white);
+    border-radius: 3px;
+    width: 15mm;
+    height: 15mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .header-logo { height: 100%; width: 100%; object-fit: contain; padding: 1.5mm; }
+  .header-brand { color: #fff; }
+  .header-brand .brand-name { font-size: 13pt; font-weight: 700; }
+  .header-brand .brand-tagline { font-size: 7.5pt; color: rgba(255,255,255,0.72); margin-top: 1px; }
+
+  .header-center { text-align: center; color: #fff; }
+  .header-center .report-type { font-size: 14pt; font-weight: 700; letter-spacing: 0.5px; }
+  .header-center .report-subtitle { font-size: 7.5pt; color: rgba(255,255,255,0.72); margin-top: 2px; }
+
+  .header-meta { text-align: right; color: rgba(255,255,255,0.85); font-size: 8pt; line-height: 1.7; }
+  .header-meta strong { display: block; font-size: 9.5pt; color: #fff; }
+
+  /* =========================
+     REPORT TITLE BLOCK
+  ========================= */
+  .report-title-block { padding: 6mm 0 4mm 0; margin-bottom: 3mm; }
+  .report-title-block h1 { font-size: 15.5pt; font-weight: 700; color: var(--navy); margin-bottom: 2px; }
+  .report-meta-row { display: flex; gap: 20px; flex-wrap: wrap; font-size: 8pt; color: var(--mid-text); margin-top: 4px; }
+  .report-meta-row strong { color: var(--dark-text); }
+
+  /* =========================
+     SECTIONS
+  ========================= */
+  .section { margin-bottom: 7mm; }
+
+  .section-title {
+    font-size: 11.5pt; font-weight: 700; color: var(--navy);
+    padding: 0 0 2mm 0; border-bottom: 1.4px solid var(--teal);
+    margin-bottom: 4mm; display: flex; align-items: center; gap: 6px;
+  }
+
+  .section-title .section-num {
+    background: var(--navy); color: #fff; font-size: 8.5pt; font-weight: 700;
+    width: 18px; height: 18px; border-radius: 50%; display: inline-flex;
+    align-items: center; justify-content: center; flex-shrink: 0;
+  }
+
+  /* =========================
+     KPI / METRIC CARDS
+  ========================= */
+  .cards-grid { display: grid; gap: 6px; margin-bottom: 2mm; }
+  .cards-grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .cards-grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+  .metric-card { border-radius: 7px; padding: 4mm 4mm; display: flex; flex-direction: column; gap: 3px; }
+  .metric-card .card-label { font-size: 7pt; font-weight: 700; color: var(--mid-text); text-transform: uppercase; letter-spacing: 0.3px; }
+  .metric-card .card-value { font-size: 15.5pt; font-weight: 700; color: var(--card-fg, var(--navy)); line-height: 1.15; }
+  .metric-card .card-sub { font-size: 7pt; color: var(--mid-text); margin-top: 1px; }
+
+  .card-blue   { background: var(--light-blue);   --card-fg: #1a2f6e; }
+  .card-teal   { background: var(--light-teal);   --card-fg: var(--green); }
+  .card-green  { background: var(--light-teal);   --card-fg: var(--green); }
+  .card-orange { background: var(--light-orange); --card-fg: var(--amber); }
+  .card-cyan   { background: var(--light-cyan);   --card-fg: var(--cyan); }
+  .card-purple { background: var(--light-purple); --card-fg: var(--purple); }
+  .card-red    { background: var(--red-light);    --card-fg: var(--red); }
+  .card-grey   { background: var(--grey-bg);      --card-fg: var(--mid-text); }
+  .card-yellow { background: var(--yellow-light); --card-fg: var(--amber); }
+
+  /* =========================
+     INFO GRID (key/value facts)
+  ========================= */
+  .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 2mm; }
+  .info-item { background: var(--row-alt); border: 1px solid var(--grey-line); border-radius: 6px; padding: 3mm 4mm; }
+  .info-label { display: block; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.4px; color: var(--mid-text); margin-bottom: 2px; }
+  .info-value { display: block; font-size: 9.5pt; font-weight: 700; color: var(--dark-text); }
+
+  /* =========================
+     TWO COLUMN LAYOUT
+  ========================= */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; }
+
+  /* =========================
+     DATA TABLES
+  ========================= */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 8.3pt; margin-bottom: 2mm; }
+  .data-table thead tr { background: var(--navy); color: #fff; }
+  .data-table thead th { padding: 2.2mm 2.2mm; text-align: left; font-weight: 700; font-size: 8.5pt; letter-spacing: 0.2px; }
+  .data-table.teal-header thead tr { background: var(--teal); }
+  .data-table.blue-header thead tr { background: var(--blue); }
+  .data-table tbody tr:nth-child(odd) { background: #fff; }
+  .data-table tbody tr:nth-child(even) { background: var(--row-alt); }
+  .data-table tbody td { padding: 2mm 2.2mm; border: 0.4px solid var(--grey-line); color: var(--dark-text); vertical-align: middle; }
+  .data-table thead th { border: 0.4px solid var(--grey-line); }
+  .data-table tfoot tr { background: var(--row-alt); }
+  .data-table tfoot td { padding: 2.5mm 2.2mm; border-top: 1.5px solid var(--navy); font-weight: 700; color: var(--dark-text); }
+  .data-table tr { page-break-inside: avoid; }
+  .data-table thead { display: table-header-group; }
+
+  .table-empty {
+    background: var(--row-alt); border: 0.6px solid var(--grey-line);
+    text-align: center; padding: 18px; color: var(--mid-text); font-style: italic;
+  }
+
+  /* =========================
+     STATUS BADGES / PILLS
+     (kept in sync with common/pdf_report.py STATUS_COLORS)
+  ========================= */
+  .badge {
+    display: inline-block; padding: 2.5px 8px; border-radius: 20px;
+    font-size: 7.5pt; font-weight: 700; white-space: nowrap;
+  }
+  .badge-completed, .badge-confirmed, .badge-active, .badge-available {
+    background: var(--light-teal); color: var(--green);
+  }
+  .badge-waiting, .badge-in-progress, .badge-pending {
+    background: var(--light-orange); color: var(--amber);
+  }
+  .badge-cancelled, .badge-inactive, .badge-unassigned {
+    background: var(--grey-bg); color: var(--mid-text);
+  }
+  .badge-no-show, .badge-left-queue, .badge-rejected, .badge-expired {
+    background: var(--red-light); color: var(--red);
+  }
+
+  /* Plain bold colored text (no pill) for the report-title-block's meta
+     "Status: X" line -- matches the ReportLab meta_html, which renders
+     status as colored bold text rather than a pill background. */
+  .status-text { font-weight: 700; text-transform: uppercase; }
+  .status-text-active, .status-text-completed, .status-text-confirmed, .status-text-available {
+    color: var(--green);
+  }
+  .status-text-pending, .status-text-waiting, .status-text-in-progress {
+    color: var(--amber);
+  }
+  .status-text-inactive, .status-text-cancelled, .status-text-unassigned {
+    color: var(--mid-text);
+  }
+  .status-text-rejected, .status-text-expired, .status-text-no-show, .status-text-left-queue {
+    color: var(--red);
+  }
+
+  /* =========================
+     CALLOUT / RECOMMENDATION BOX
+  ========================= */
+  .recommendation-box {
+    border-left: 4px solid var(--teal); background: var(--light-teal);
+    border-radius: 0 6px 6px 0; padding: 3.5mm 5mm; margin-bottom: 4mm;
+  }
+  .recommendation-box .rec-label { font-size: 7.5pt; font-weight: 700; color: var(--teal-dark); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .recommendation-box .rec-text { font-size: 9.5pt; font-weight: 600; color: var(--dark-text); }
+
+  /* =========================
+     UTILITIES
+  ========================= */
+  .text-navy  { color: var(--navy); }
+  .text-teal  { color: var(--teal); }
+  .text-muted { color: var(--mid-text); }
+  .fw-bold    { font-weight: 700; }
+  .center     { text-align: center; }
+  .right      { text-align: right; }
+  .small      { font-size: 7pt; }
+  .mt-2       { margin-top: 2mm; }
+  .mb-4       { margin-bottom: 4mm; }
+
+  .no-break      { page-break-inside: avoid; }
+  .page-break    { page-break-before: always; padding-top: 8mm; }
+  .page-break-gap{ margin-top: 8mm; }
+
+  /* =========================
+     FOOTER
+     Both pieces below are pulled out of normal flow (position: running())
+     into the unified @page bottom-center box above -- see the big comment
+     there for how each ends up on the pages it does.
+  ========================= */
+  .report-footer-full {
+    position: running(richfooter);
+    border-top: 1px solid var(--grey-line);
+    padding: 3mm 8mm 3mm 8mm;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10mm;
+  }
+  .footer-logo-block { display: flex; align-items: center; gap: 6px; }
+  .footer-logo { height: 6mm; width: auto; object-fit: contain; }
+  .footer-company { font-size: 6.6pt; line-height: 1.5; }
+  .footer-company .company-name { font-weight: 700; color: var(--navy-dark); font-size: 8.3pt; }
+  .footer-company .powered-by { color: #2563eb; font-weight: 700; font-size: 7pt; }
+  .footer-company .company-detail { color: var(--mid-text); font-size: 6.6pt; }
+  .footer-right-block { text-align: right; font-size: 8pt; font-weight: 700; color: var(--navy-dark); white-space: nowrap; }
+
+  /* Thin per-page strip (Printed On / Page N of Total / Confidential).
+     counter(page)/counter(pages) still resolve correctly per page even
+     though the source element lives in normal flow, because they're
+     evaluated where the content is finally rendered (the margin box),
+     not where it's declared in the document. */
+  .report-footer-strip {
+    position: running(stripline);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 6.6pt;
+    color: var(--mid-text);
+    padding: 0 8mm 4.5mm 8mm;
+  }
+  .report-footer-strip .strip-page::after {
+    content: "Page " counter(page) " of " counter(pages);
+  }
+
+  @media print {
+    .data-table { page-break-inside: auto; }
+  }
+</style>
+
+{% block extra_styles %}{% endblock %}
+</head>
+
+<body>
+
+<div class="report-footer-strip">
+  <span>Printed On: {{ printed_on }}</span>
+  <span class="strip-page"></span>
+  <span>Confidential - For Internal Use Only</span>
+</div>
+
+<header class="report-header">
+  <div class="header-logo-block">
+    {% if isf_logo_path %}
+    <div class="header-logo-chip">
+      <img src="{{ isf_logo_path }}" class="header-logo" onerror="this.style.display='none'"/>
+    </div>
+    {% endif %}
+    <div class="header-brand">
+      <div class="brand-name">IndusServiceFlow</div>
+      <div class="brand-tagline">Flowing Services, Building Trust</div>
+    </div>
+  </div>
+  <div class="header-center">
+    <div class="report-type">{% block report_type %}Report{% endblock %}</div>
+    <div class="report-subtitle">{% block report_subtitle %}IndusServiceFlow Analytics{% endblock %}</div>
+  </div>
+  <div class="header-meta">
+    <strong>{% block header_org %}IndusServiceFlow{% endblock %}</strong>
+    {% block header_date %}{{ generated_at }}{% endblock %}
+  </div>
+</header>
+
+<main class="page-content">
+  {% block content %}{% endblock %}
+
+  <div class="report-footer-full no-break">
+    <div class="footer-logo-block">
+      {% if orchasp_logo_path %}<img src="{{ orchasp_logo_path }}" class="footer-logo" onerror="this.style.display='none'"/>{% endif %}
+      <div class="footer-company">
+        <div class="company-name">IndusServiceFlow</div>
+        <div class="powered-by">Powered by Orchasp Limited</div>
+        <div class="company-detail">CIN: L72200TG1994PLC017485</div>
+        <div class="company-detail">19 &amp; 20, Moti Valley, Trimulgherry, Secunderabad - 500 015, Telangana, INDIA</div>
+        <div class="company-detail">Email: info@orchasp.com &nbsp;|&nbsp; Tel: +91-40-4776 6123 / 124</div>
+      </div>
+    </div>
+    <div class="footer-right-block">{% block footer_right %}{% endblock %}</div>
+  </div>
+</main>
+
+</body>
+</html>

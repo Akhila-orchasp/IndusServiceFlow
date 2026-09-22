@@ -1,0 +1,294 @@
+{% extends "report/base_report.html" %}
+
+{% block title %}Organization Report – {{ data.organization.name }} – IndusServiceFlow{% endblock %}
+{% block report_type %}Organization Report{% endblock %}
+{% block report_subtitle %}Operational Analytics &amp; Performance Insights{% endblock %}
+{% block header_org %}{{ data.organization.name }}{% endblock %}
+{% block footer_right %}{{ data.organization.name }} &nbsp;|&nbsp; {{ generated_at }}{% endblock %}
+
+{% block content %}
+
+<!-- ── Report Title ──────────────────────────────────────────────────────── -->
+<div class="report-title-block no-break">
+  <h1>{{ data.organization.name }}</h1>
+  <div class="report-meta-row">
+    <span>Category: <strong>{{ data.organization.category|default:"—" }}</strong></span>
+    <span>City: <strong>{{ data.organization.city }}</strong></span>
+    <span>State: <strong>{{ data.organization.state }}</strong></span>
+    <span>Status:
+      <span class="status-text
+        {% if data.organization.status == 'Active' %}status-text-active
+        {% elif data.organization.status == 'Pending' %}status-text-pending
+        {% elif data.organization.status == 'Rejected' %}status-text-rejected
+        {% else %}status-text-inactive{% endif %}">
+        {{ data.organization.status }}
+      </span>
+    </span>
+    <span>Generated: <strong>{{ generated_at }}</strong></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 1 — ORGANIZATION DETAILS
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div class="section no-break">
+  <div class="section-title">
+    <span class="section-num">1</span> Organization Details
+  </div>
+
+  <div class="info-grid">
+    <div class="info-item">
+      <div class="info-label">Organization Name</div>
+      <div class="info-value">{{ data.organization.name }}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Business Category</div>
+      <div class="info-value">{{ data.organization.category|default:"—" }}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Email</div>
+      <div class="info-value">{{ data.organization.email }}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">City</div>
+      <div class="info-value">{{ data.organization.city }}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">State</div>
+      <div class="info-value">{{ data.organization.state }}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Country</div>
+      <div class="info-value">{{ data.organization.country }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 2 — TODAY'S DASHBOARD ANALYTICS
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div class="section no-break">
+  <div class="section-title">
+    <span class="section-num">2</span> Today's Dashboard Analytics
+  </div>
+
+  <div class="cards-grid cards-grid-4">
+    <div class="metric-card card-blue">
+      <div class="card-label">Patients Today</div>
+      <div class="card-value">{{ data.dashboard_analytics.patients_today }}</div>
+      <div class="card-sub">Total booked today</div>
+    </div>
+    <div class="metric-card card-teal">
+      <div class="card-label">Patients Served</div>
+      <div class="card-value">{{ data.dashboard_analytics.patients_served }}</div>
+      <div class="card-sub">Completed today</div>
+    </div>
+    <div class="metric-card card-orange">
+      <div class="card-label">Active Queue</div>
+      <div class="card-value">{{ data.dashboard_analytics.active_queue }}</div>
+      <div class="card-sub">Waiting + In Progress</div>
+    </div>
+    <div class="metric-card card-grey">
+      <div class="card-label">Queue Waiting</div>
+      <div class="card-value">{{ data.dashboard_analytics.queue_waiting }}</div>
+      <div class="card-sub">Currently waiting</div>
+    </div>
+  </div>
+
+  <div class="cards-grid cards-grid-4 mt-2">
+    <div class="metric-card card-green">
+      <div class="card-label">Employee Utilization</div>
+      <div class="card-value">{{ data.dashboard_analytics.employee_utilization }}%</div>
+      <div class="card-sub">Busy / Total active staff</div>
+    </div>
+    <div class="metric-card card-yellow">
+      <div class="card-label">Peak Hour</div>
+      <div class="card-value" style="font-size:13pt;">{{ data.dashboard_analytics.peak_hour|default:"—" }}</div>
+      <div class="card-sub">Highest booking volume</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 3 — APPOINTMENT SUMMARY
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break-gap no-break">
+  <div class="section-title">
+    <span class="section-num">3</span> Appointment Summary
+  </div>
+
+  <!-- Total card -->
+  <div class="recommendation-box mb-4">
+    <div class="rec-label">Total Appointments (All Time)</div>
+    <div class="rec-text" style="font-size:14pt;">
+      {{ data.appointment_summary.total_appointments }}
+    </div>
+  </div>
+
+  <table class="data-table teal-header">
+    <thead>
+      <tr>
+        <th>Status</th>
+        <th class="center">Count</th>
+        <th class="center">Share (%)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in data.appointment_summary.status_breakdown %}
+      <tr>
+        <td>
+          <span class="badge
+            {% if item.status == 'Completed' %}badge-completed
+            {% elif item.status == 'Confirmed' %}badge-active
+            {% elif item.status == 'Cancelled' %}badge-cancelled
+            {% elif item.status == 'No Show' %}badge-rejected
+            {% elif item.status == 'In Progress' %}badge-pending
+            {% else %}badge-inactive{% endif %}">
+            {{ item.status }}
+          </span>
+        </td>
+        <td class="center fw-bold">{{ item.count }}</td>
+        <td class="center text-muted">
+          {% if data.appointment_summary.total_appointments > 0 %}
+          {% widthratio item.count data.appointment_summary.total_appointments 100 %}%
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td class="fw-bold">Total</td>
+        <td class="center fw-bold">{{ data.appointment_summary.total_appointments }}</td>
+        <td class="center">100%</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 4 — PEAK BOOKING HOURS
+     ══════════════════════════════════════════════════════════════════════════ -->
+{% if data.peak_booking_hours %}
+<div class="section page-break-gap no-break">
+  <div class="section-title">
+    <span class="section-num">4</span> Peak Booking Hours
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Time Slot</th>
+        <th class="center">Appointments</th>
+        <th class="right">Volume Bar</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in data.peak_booking_hours %}
+      <tr>
+        <td class="fw-bold">{{ item.hour }}</td>
+        <td class="center">{{ item.count }}</td>
+        <td class="right">
+          <div style="display:inline-block; background:var(--light-blue);
+                      border-radius:3px; height:8px;
+                      width:{% widthratio item.count data.peak_booking_hours.0.count 120 %}px;
+                      min-width:4px; vertical-align:middle;">
+          </div>
+          &nbsp;<span class="text-muted small">{{ item.count }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 5 — STAFF PERFORMANCE  (page break before)
+     ══════════════════════════════════════════════════════════════════════════ -->
+{% if data.staff_performance %}
+<div class="section page-break-gap page-break">
+  <div class="section-title">
+    <span class="section-num">5</span> Staff Performance
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Employee</th>
+        <th class="center">Assigned</th>
+        <th class="center">Completed</th>
+        <th class="center">Cancelled</th>
+        <th class="center">Completion Rate</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for emp in data.staff_performance %}
+      <tr>
+        <td class="text-muted">{{ forloop.counter }}</td>
+        <td class="fw-bold">{{ emp.employee }}</td>
+        <td class="center">{{ emp.total_assigned }}</td>
+        <td class="center text-teal fw-bold">{{ emp.completed }}</td>
+        <td class="center" style="color:var(--orange);">{{ emp.cancelled }}</td>
+        <td class="center">
+          <span
+            style="
+            display:inline-block;
+            padding:1px 8px;
+            border-radius:20px;
+            font-size:7.5pt;
+            font-weight:700;
+            background:{% if emp.completion_rate >= 80 %}var(--green-light){% elif emp.completion_rate >= 50 %}var(--yellow-light){% else %}var(--red-light){% endif %};
+            color:{% if emp.completion_rate >= 80 %}var(--green){% elif emp.completion_rate >= 50 %}#92400e{% else %}#9f1239{% endif %};">
+            {{ emp.completion_rate }}%
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 6 — CUSTOMER FLOW (Today by Time Slot)
+     ══════════════════════════════════════════════════════════════════════════ -->
+{% if data.customer_flow %}
+<div class="section no-break">
+  <div class="section-title">
+    <span class="section-num">6</span> Customer Flow – Today by Time Slot
+  </div>
+
+  <table class="data-table blue-header">
+    <thead>
+      <tr>
+        <th>Time Slot</th>
+        <th class="center">Booked</th>
+        <th class="center">Served</th>
+        <th class="center">Pending</th>
+        <th class="center">Service Rate</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for slot in data.customer_flow %}
+      <tr>
+        <td class="fw-bold">{{ slot.slot }}</td>
+        <td class="center">{{ slot.booked }}</td>
+        <td class="center text-teal fw-bold">{{ slot.served }}</td>
+        <td class="center" style="color:var(--orange);">{{ slot.pending }}</td>
+        <td class="center">
+          {% if slot.booked > 0 %}
+          {% widthratio slot.served slot.booked 100 %}%
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+
+
+{% endblock %}

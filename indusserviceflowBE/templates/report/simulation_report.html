@@ -1,0 +1,260 @@
+{% extends "report/base_report.html" %}
+
+{% block title %}Simulation Report #{{ simulation.id }} – IndusServiceFlow{% endblock %}
+{% block report_type %}Queue Simulation Report{% endblock %}
+{% block report_subtitle %}Queue Analysis &amp; Performance Insights{% endblock %}
+{% block header_org %}{{ simulation.organization.organization_name }}{% endblock %}
+{% block footer_right %}Simulation #{{ simulation.id }} &nbsp;|&nbsp; {{ generated_at }}{% endblock %}
+
+{% block content %}
+
+<!-- ── Report Title ──────────────────────────────────────────────────────── -->
+<div class="report-title-block no-break">
+  <h1>Queue Simulation Report</h1>
+  <div class="report-meta-row">
+    <span>Organization: <strong>{{ simulation.organization.organization_name }}</strong></span>
+    <span>Simulation ID: <strong>#{{ simulation.id }}</strong></span>
+    <span>Status:
+      <span class="status-text
+        {% if simulation.status == 'completed' %}status-text-completed
+        {% elif simulation.status == 'running' %}status-text-pending
+        {% elif simulation.status == 'failed' %}status-text-rejected
+        {% else %}status-text-inactive{% endif %}">
+        {{ simulation.status }}
+      </span>
+    </span>
+    <span>Generated: <strong>{{ generated_at }}</strong></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 1 — SIMULATION PARAMETERS
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div class="section no-break">
+  <div class="section-title">
+    <span class="section-num">1</span> Simulation Parameters
+  </div>
+
+  <div class="info-grid">
+    <div class="info-item">
+      <div class="info-label">Organization</div>
+      <div class="info-value">{{ simulation.organization.organization_name }}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Arrival Probability</div>
+      <div class="info-value">{{ simulation.arrival_probability }}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Service Probability</div>
+      <div class="info-value">{{ simulation.service_probability }}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Simulated Arrivals</div>
+      <div class="info-value">{{ simulation.number_of_arrivals }}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Time Horizon</div>
+      <div class="info-value">{{ simulation.time_horizon }} hrs</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Created At</div>
+      <div class="info-value">{{ simulation.created_at|date:"d M Y, h:i A" }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 2 — KEY METRICS
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div class="section no-break">
+  <div class="section-title">
+    <span class="section-num">2</span> Key Metrics
+  </div>
+
+  <div class="cards-grid cards-grid-4">
+    <div class="metric-card card-blue">
+      <div class="card-label">Total Customers</div>
+      <div class="card-value">{{ result.total_customers }}</div>
+      <div class="card-sub">Simulated arrivals</div>
+    </div>
+    <div class="metric-card card-teal">
+      <div class="card-label">Customers Served</div>
+      <div class="card-value">{{ result.customers_served }}</div>
+      <div class="card-sub">Successfully served</div>
+    </div>
+    <div class="metric-card card-orange">
+      <div class="card-label">Currently Waiting</div>
+      <div class="card-value">{{ result.currently_waiting }}</div>
+      <div class="card-sub">In queue</div>
+    </div>
+    <div class="metric-card card-red">
+      <div class="card-label">Left Without Service</div>
+      <div class="card-value">{{ result.left_without_service }}</div>
+      <div class="card-sub">Abandoned queue</div>
+    </div>
+  </div>
+
+  <div class="cards-grid cards-grid-4 mt-2">
+    <div class="metric-card card-blue">
+      <div class="card-label">Avg Wait Time</div>
+      <div class="card-value" style="font-size:13pt;">{{ result.average_waiting_time|floatformat:1 }} min</div>
+      <div class="card-sub">Average per customer</div>
+    </div>
+    <div class="metric-card card-orange">
+      <div class="card-label">Max Wait Time</div>
+      <div class="card-value" style="font-size:13pt;">{{ result.maximum_waiting_time|floatformat:1 }} min</div>
+      <div class="card-sub">Peak wait observed</div>
+    </div>
+    <div class="metric-card card-grey">
+      <div class="card-label">Idle Time</div>
+      <div class="card-value" style="font-size:13pt;">{{ result.idle_time|floatformat:2 }} hrs</div>
+      <div class="card-sub">Server idle duration</div>
+    </div>
+    <div class="metric-card
+      {% if result.utilization >= 80 %}card-red
+      {% elif result.utilization >= 50 %}card-orange
+      {% else %}card-teal{% endif %}">
+      <div class="card-label">Utilization</div>
+      <div class="card-value" style="font-size:13pt;">{{ result.utilization|floatformat:1 }}%</div>
+      <div class="card-sub">Server utilization rate</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 3 — DETAILED RESULTS
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break-gap no-break">
+  <div class="section-title">
+    <span class="section-num">3</span> Detailed Results
+  </div>
+
+  <table class="data-table teal-header">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th class="right">Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="fw-bold">Total Customers</td>
+        <td class="right">{{ result.total_customers }}</td>
+      </tr>
+      <tr>
+        <td class="fw-bold">Customers Served</td>
+        <td class="right">{{ result.customers_served }}</td>
+      </tr>
+      <tr>
+        <td class="fw-bold">Currently Waiting</td>
+        <td class="right">{{ result.currently_waiting }}</td>
+      </tr>
+      <tr>
+        <td class="fw-bold">Left Without Service</td>
+        <td class="right">{{ result.left_without_service }}</td>
+      </tr>
+      <tr>
+        <td class="fw-bold">Average Waiting Time (min)</td>
+        <td class="right">{{ result.average_waiting_time|floatformat:2 }}</td>
+      </tr>
+      <tr>
+        <td class="fw-bold">Maximum Waiting Time (min)</td>
+        <td class="right">{{ result.maximum_waiting_time|floatformat:2 }}</td>
+      </tr>
+      <tr>
+        <td class="fw-bold">Idle Time (hrs)</td>
+        <td class="right">{{ result.idle_time|floatformat:2 }}</td>
+      </tr>
+      <tr>
+        <td class="fw-bold">Utilization (%)</td>
+        <td class="right">{{ result.utilization|floatformat:2 }}</td>
+      </tr>
+      <tr>
+        <td class="fw-bold">Recommended Employees</td>
+        <td class="right">{{ result.recommended_doctors }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 4 — RECOMMENDATION
+     ══════════════════════════════════════════════════════════════════════════ -->
+{% if result.recommendation_message %}
+<div class="section no-break">
+  <div class="section-title">
+    <span class="section-num">4</span> Recommendation
+  </div>
+
+  <div class="recommendation-box">
+    <div class="rec-label">System Recommendation</div>
+    <div class="rec-text">{{ result.recommendation_message }}</div>
+  </div>
+
+  <div class="cards-grid cards-grid-2">
+    <div class="metric-card card-teal">
+      <div class="card-label">Recommended Employees / Servers</div>
+      <div class="card-value">{{ result.recommended_doctors }}</div>
+      <div class="card-sub">Total Optimal staffing level</div>
+    </div>
+    <div class="metric-card
+      {% if result.utilization >= 80 %}card-red
+      {% elif result.utilization >= 50 %}card-orange
+      {% else %}card-green{% endif %}">
+      <div class="card-label">Current Utilization</div>
+      <div class="card-value">{{ result.utilization|floatformat:1 }}%</div>
+      <div class="card-sub">
+        {% if result.utilization >= 80 %}High load – consider adding staff
+        {% elif result.utilization >= 50 %}Moderate load
+        {% else %}Low load – optimal{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SECTION 5 — HOURLY TREND ANALYSIS
+     ══════════════════════════════════════════════════════════════════════════ -->
+{% if trends %}
+<div class="section page-break-gap">
+  <div class="section-title">
+    <span class="section-num">5</span> Hourly Trend Analysis
+  </div>
+
+  <table class="data-table blue-header">
+    <thead>
+      <tr>
+        <th>Hour</th>
+        <th class="right">Avg Wait (min)</th>
+        <th class="center">Max Queue Length</th>
+        <th class="center">Utilization (%)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tr in trends %}
+      <tr>
+        <td class="fw-bold">Hour {{ tr.hour }}</td>
+        <td class="right">{{ tr.average_wait|floatformat:2 }}</td>
+        <td class="center">{{ tr.maximum_queue }}</td>
+        <td class="center">
+          <span
+            style="
+            display:inline-block;
+            padding:1px 8px;
+            border-radius:20px;
+            font-size:7.5pt;
+            font-weight:700;
+            background:{% if tr.utilization >= 80 %}var(--red-light){% elif tr.utilization >= 50 %}var(--light-orange){% else %}var(--light-teal){% endif %};
+            color:{% if tr.utilization >= 80 %}#9f1239{% elif tr.utilization >= 50 %}#92400e{% else %}var(--teal){% endif %};">
+            {{ tr.utilization|floatformat:2 }}%
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endblock %}

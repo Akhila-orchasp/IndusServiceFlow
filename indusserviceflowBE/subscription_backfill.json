@@ -1,0 +1,10 @@
+{
+  "Doctor's Clinic": {"plan": "Free Trial", "billing_cycle": "Free Trial"},
+  "Indusind bank": {"plan": "Starter", "billing_cycle": "Monthly"},
+  "nandhini hospitals": {"plan": "Free Trial", "billing_cycle": "Free Trial"},
+  "NIMS Hospital": {"plan": "Growth", "billing_cycle": "Monthly"},
+  "Omini Multi Speciality Hospitals": {"plan": "Growth", "billing_cycle": "Monthly"},
+  "Saanvi Hospitals": {"plan": "Enterprise", "billing_cycle": "Monthly"},
+  "Telecaller": {"plan": "Starter", "billing_cycle": "Monthly"},
+  "Yashoda Hospitals": {"plan": "Free Trial", "billing_cycle": "Free Trial"}
+}
