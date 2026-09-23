@@ -82,7 +82,7 @@ class Appointment(models.Model):
 
     class Meta:
 
-        db_table = "Appointment"
+        db_table = "appointment"
 
         ordering = ["-date", "-time"]
 
@@ -179,7 +179,7 @@ class AppointmentService(models.Model):
 
     class Meta:
 
-        db_table = "AppointmentService"
+        db_table = "appointmentservice"
 
         ordering = ["appointment_service_id"]
 

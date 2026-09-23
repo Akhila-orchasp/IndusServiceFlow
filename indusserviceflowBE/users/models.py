@@ -41,7 +41,6 @@ class User(AbstractUser):
         choices=STATUS_CHOICES,
         default="Pending"
     )
-    # Password Reset Fields
     reset_otp = models.CharField(
         max_length=6,
         blank=True,

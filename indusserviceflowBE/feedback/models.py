@@ -8,20 +8,6 @@ from organizations.models import Organization
 
 
 class FeedbackRequest(models.Model):
-    """
-    One row per completed AppointmentService leg for which a "how was
-    your visit" email has been sent. The `token` is the only thing the
-    customer's email link carries, so the feedback form (which is
-    filled in without logging in) can look the appointment back up
-    and know what is safe to show/accept.
-
-    Only ever created once per leg - see
-    feedback.services.request_feedback_for_service(), which is the
-    single place these get created - so re-completing the same leg
-    never sends a duplicate email. An appointment can have several of
-    these (one per completed leg), so `appointment` is a plain
-    ForeignKey rather than one-to-one.
-    """
 
     feedback_request_id = models.AutoField(
         primary_key=True, db_column="FeedbackRequestId"
@@ -57,7 +43,7 @@ class FeedbackRequest(models.Model):
 
     class Meta:
 
-        db_table = "FeedbackRequest"
+        db_table = "feedbackrequest"
 
         ordering = ["-created_on"]
 

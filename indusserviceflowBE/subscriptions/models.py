@@ -102,11 +102,6 @@ class Subscription(models.Model):
         return f"{self.organization.organization_name} - {self.plan.plan_name}"
 
     def live_employee_count(self):
-        """Actual current number of active employees under this
-        subscription's organization — computed on demand instead of
-        trusting the stored `employees` column, which is only ever set
-        once (usually to 0) when the subscription is created and never
-        updated afterwards as employees are added/removed."""
         if not self.organization_id:
             return 0
         return self.organization.employees.filter(status="Active").count()

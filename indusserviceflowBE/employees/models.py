@@ -60,7 +60,7 @@ class Shift(models.Model):
     updated_on = models.DateTimeField(auto_now=True, db_column="UpdatedOn")
 
     class Meta:
-        db_table = "Shift"
+        db_table = "shift"
 
     def __str__(self):
         return self.shift_name
@@ -182,7 +182,7 @@ class EmployeeService(models.Model):
     updated_on = models.DateTimeField(auto_now=True, db_column="UpdatedOn")
 
     class Meta:
-        db_table = "EmployeeServices"
+        db_table = "employeeservices"
         unique_together = (("employee", "service"),)
 
     def __str__(self):
