@@ -2,7 +2,7 @@ import axios from "axios";
 
 export const API_BASE_URL =
   (import.meta as ImportMeta & { env?: { VITE_API_URL?: string } }).env
-    ?.VITE_API_URL || "http://indusserviceflow-production.up.railway.app/api";
+    ?.VITE_API_URL || "https://indusserviceflow-production.up.railway.app/api";
 
 
 const api = axios.create({
