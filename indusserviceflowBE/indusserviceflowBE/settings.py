@@ -14,6 +14,7 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 _env_allowed_hosts = config("ALLOWED_HOSTS", default="10.168.130.27")
 
 ALLOWED_HOSTS = [host.strip() for host in _env_allowed_hosts.split(",") if host.strip()]
+ALLOWED_HOSTS="http://indusserviceflow-production.up.railway.app"
 
 
 for _host in ("127.0.0.1", "localhost"):
