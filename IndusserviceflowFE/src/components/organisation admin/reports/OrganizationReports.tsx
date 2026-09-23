@@ -337,7 +337,7 @@ export default function OrganizationReports() {
                       <CartesianGrid {...chartGrid} />
                       <XAxis dataKey="date" {...axis} />
                       <YAxis allowDecimals={false} {...axis} />
-                      <RechartsTooltip formatter={(value: number) => [`${value} min`, "Avg wait"]} />
+                      <RechartsTooltip formatter={(value) => [`${value} min`, "Avg wait"]} />
                       <Area type="monotone" dataKey="avg_wait_min" name="Avg wait (min)" stroke="#D97706" fill={alpha("#D97706", .16)} strokeWidth={2.5} />
                     </AreaChart>
                   </ResponsiveContainer>
