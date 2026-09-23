@@ -11,15 +11,12 @@ SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
 
 
-# _env_allowed_hosts = config("ALLOWED_HOSTS", default="10.168.130.27")
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="localhost,127.0.0.1"
+).split(",")
 
-# ALLOWED_HOSTS = [host.strip() for host in _env_allowed_hosts.split(",") if host.strip()]
-ALLOWED_HOSTS="http://indusserviceflow-production.up.railway.app"
-
-
-for _host in ("127.0.0.1", "localhost"):
-    if _host not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS.append(_host)
+ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS if host.strip()]
 
 
 INSTALLED_APPS = [
@@ -194,7 +191,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://10.168.130.27:5173",
-    "https://indus-service-flow.vercel.app",3
+    "https://indus-service-flow.vercel.app",
 ]
 
-CORS_ALLOW_CREDENTIALS = True
