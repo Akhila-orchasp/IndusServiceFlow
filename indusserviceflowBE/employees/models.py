@@ -126,15 +126,9 @@ class Employee(models.Model):
     updated_on = models.DateTimeField(auto_now=True, db_column="UpdatedOn")
 
     class Meta:
-        db_table = "Employee"
+        db_table = "employee"
 
         constraints = [
-            # An email only has to be unique *within* an organization.
-            # The same person can legitimately exist as an employee of
-            # two different organizations, so a global unique index on
-            # Email would wrongly reject them for every org after the
-            # first. Lower() makes the check case-insensitive so
-            # "A@x.com" and "a@x.com" still collide inside one org.
             models.UniqueConstraint(
                 Lower("email"),
                 "org",
