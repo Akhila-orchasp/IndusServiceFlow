@@ -97,7 +97,7 @@ class Notification(models.Model):
     read_on = models.DateTimeField(null=True, blank=True, db_column="ReadOn")
 
     class Meta:
-        db_table = "Notification"
+        db_table = "notification"
 
         ordering = ["-created_on"]
 
