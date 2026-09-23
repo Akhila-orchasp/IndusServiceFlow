@@ -100,7 +100,7 @@ interface NotificationBellProps {
   livePollMs?: number;
 }
 
-const NotificationBell = ({ scope, pollMs = 20000, livePollMs = 10000 }: NotificationBellProps) => {
+const NotificationBell = ({ scope, pollMs = 60000, livePollMs = 30000 }: NotificationBellProps) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);

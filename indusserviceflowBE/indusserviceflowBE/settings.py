@@ -94,6 +94,8 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD"),
         "HOST": config("DB_HOST"),
         "PORT": config("DB_PORT"),
+        "CONN_MAX_AGE": 60,
+        "CONN_HEALTH_CHECKS": True,
     }
 }
 
@@ -107,19 +109,6 @@ REST_FRAMEWORK = {
         "otp_request": "5/hour",
         "otp_verify": "10/hour",
     },
-    # By default DRF serializes every DecimalField (Plan.monthly_price,
-    # Plan.annual_price, Subscription.amount, etc.) as a JSON STRING
-    # (e.g. "0.00") to avoid floating-point rounding in transit. The
-    # frontend, however, treats these as JS numbers everywhere (PublicPlan
-    # types them as `number`, and does strict `=== 0` checks such as
-    # `isFullyFreePlan = plan.monthly_price === 0 && plan.annual_price === 0`
-    # in BillingCycleStep.tsx). A string "0.00" never strictly equals the
-    # number 0, so those checks silently fail — e.g. a genuinely free plan
-    # still renders the full Monthly/Annual/Trial billing-cycle picker
-    # (showing "₹0.00" instead of "Free") instead of the simplified
-    # single-confirmation screen. Turning this off makes DRF emit real
-    # JSON numbers for every decimal field project-wide, matching what the
-    # frontend already assumes.
     "COERCE_DECIMAL_TO_STRING": False,
 }
 
@@ -164,8 +153,6 @@ EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=10, cast=int)
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-# Where landing-page contact form submissions are emailed.
-# Optional: defaults to the SMTP account itself (EMAIL_HOST_USER).
 CONTACT_NOTIFICATION_EMAIL = config(
     "CONTACT_NOTIFICATION_EMAIL", default=EMAIL_HOST_USER
 )
@@ -182,8 +169,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "users.User"
 
-
-# CORS
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
