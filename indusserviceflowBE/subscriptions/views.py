@@ -504,6 +504,7 @@ def get_subscriptions(request):
         "monthly_revenue": "monthly_revenue",
         "next_payment": "next_payment_date",
         "customer_since": "created_on",
+        "started_on": "start_date",
     }
 
     sort_by = request.GET.get("sort_by")
@@ -605,7 +606,7 @@ def get_subscriptions(request):
 
     agg = all_subs.aggregate(
         total_subscriptions=Count("id"),
-        monthly_revenue=Sum("monthly_revenue", filter=not_rejected_active),
+        active_monthly_revenue=Sum("monthly_revenue", filter=not_rejected_active),
         total_employees=Sum("employees", filter=not_rejected_active),
         # Distinct organizations, not raw row count — an org should only ever
         # have one Active row, but count distinct orgs defensively so any
@@ -654,7 +655,7 @@ def get_subscriptions(request):
 
     summary = {
         "total_subscriptions": agg["total_subscriptions"],
-        "monthly_revenue": agg["monthly_revenue"] or 0,
+        "monthly_revenue": agg["active_monthly_revenue"] or 0,
         "monthly_revenue_change_pct": 0,
         "active_organizations": agg["active_organizations"],
         "active_organizations_change": agg["active_organizations_change"],
