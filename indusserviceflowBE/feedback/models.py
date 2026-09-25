@@ -119,7 +119,7 @@ class Feedback(models.Model):
 
     class Meta:
 
-        db_table = "Feedback"
+        db_table = "feedback"
 
         ordering = ["-created_on"]
 
