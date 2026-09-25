@@ -1,5 +1,5 @@
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Count
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from .utils import log_action
@@ -414,19 +414,29 @@ def _user_history_queryset(request, username):
 @permission_classes([IsAuthenticated])
 def get_audit_logs(request):
 
-    logs = _scoped_queryset(request).order_by("-audit_date")
+    logs = _scoped_queryset(request).select_related("organization").order_by(
+        "-audit_date"
+    )
     logs = _apply_filters(logs, request)
 
     page = int(request.GET.get("page", 1))
     page_size = int(request.GET.get("page_size", 10))
 
-    total_logs = logs.count()
-    approve_logs = logs.filter(action_name__iexact="Approve").count()
-    update_logs = logs.filter(action_name__iexact="Update").count()
-    delete_logs = logs.filter(action_name__iexact="Delete").count()
+    # One combined query instead of 4 separate .count() calls.
+    counts = logs.aggregate(
+        approves=Count("id", filter=Q(action_name__iexact="Approve")),
+        updates=Count("id", filter=Q(action_name__iexact="Update")),
+        deletes=Count("id", filter=Q(action_name__iexact="Delete")),
+    )
+    approve_logs = counts["approves"]
+    update_logs = counts["updates"]
+    delete_logs = counts["deletes"]
 
     paginator = Paginator(logs, page_size)
     page_obj = paginator.get_page(page)
+    # paginator.count already runs (and caches) the total count of `logs`,
+    # so re-running logs.count() separately would just be a duplicate query.
+    total_logs = paginator.count
 
     data = []
     for log in page_obj:

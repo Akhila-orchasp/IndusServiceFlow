@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.core.paginator import Paginator
 
 from rest_framework.decorators import api_view, permission_classes
@@ -399,19 +399,20 @@ def get_users(request):
     page = request.GET.get("page", 1)
     page_size = request.GET.get("page_size", 10)
 
+    # One combined query instead of 4 separate .count() calls.
     all_org_admins = User.objects.filter(role="ORG_ADMIN")
-    total_count = all_org_admins.count()
-    active_count = all_org_admins.filter(status__iexact="active").count()
-    pending_count = all_org_admins.filter(status__iexact="pending").count()
-    rejected_count = all_org_admins.filter(
-        organization__status__iexact="rejected"
-    ).count()
+    admin_counts = all_org_admins.aggregate(
+        total=Count("id"),
+        active=Count("id", filter=Q(status__iexact="active")),
+        pending=Count("id", filter=Q(status__iexact="pending")),
+        rejected=Count("id", filter=Q(organization__status__iexact="rejected")),
+    )
     summary = {
-        "total": total_count,
-        "active": active_count,
-        "pending": pending_count,
-        "rejected": rejected_count,
-        "inactive": rejected_count,
+        "total": admin_counts["total"],
+        "active": admin_counts["active"],
+        "pending": admin_counts["pending"],
+        "rejected": admin_counts["rejected"],
+        "inactive": admin_counts["rejected"],
     }
 
     paginator = Paginator(users, page_size)

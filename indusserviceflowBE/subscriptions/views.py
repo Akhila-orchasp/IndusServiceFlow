@@ -597,26 +597,27 @@ def get_subscriptions(request):
     year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     thirty_days_ago = now - timedelta(days=30)
 
-    monthly_revenue = active_subs.aggregate(total=Sum("monthly_revenue"))["total"] or 0
-    total_employees = active_subs.aggregate(total=Sum("employees"))["total"] or 0
+    # Everything below used to be ~15 separate .count()/.aggregate() calls,
+    # each its own DB round trip. Django can compute all of them in ONE query
+    # using conditional Count/Sum(filter=...), which is what makes this slow
+    # summary block fast even against a database with high per-query latency.
+    not_rejected_active = Q(status="Active") & ~Q(organization__status="Rejected")
 
-    summary = {
-        "total_subscriptions": all_subs.count(),
-        "monthly_revenue": monthly_revenue,
-        "monthly_revenue_change_pct": 0,
+    agg = all_subs.aggregate(
+        total_subscriptions=Count("id"),
+        monthly_revenue=Sum("monthly_revenue", filter=not_rejected_active),
+        total_employees=Sum("employees", filter=not_rejected_active),
         # Distinct organizations, not raw row count — an org should only ever
         # have one Active row, but count distinct orgs defensively so any
         # leftover duplicate-Active row (e.g. from data created before the
         # update_subscription fix) can't inflate this KPI above the real
         # number of subscribed organizations.
-        "active_organizations": active_subs.values("organization").distinct().count(),
-        "active_organizations_change": all_subs.filter(
-            status="Active", created_on__gte=month_start
-        )
-        .exclude(organization__status="Rejected")
-        .count(),
-        "total_employees": total_employees,
-        "total_employees_change": 0,
+        active_organizations=Count(
+            "organization", filter=not_rejected_active, distinct=True
+        ),
+        active_organizations_change=Count(
+            "id", filter=not_rejected_active & Q(created_on__gte=month_start)
+        ),
         # Only trial subscriptions that are still Active count here.
         # An org that upgraded from trial to a paid plan (e.g. Growth)
         # before the trial expired has its old trial row moved to
@@ -624,33 +625,60 @@ def get_subscriptions(request):
         # of this KPI instead of still being counted as "on trial".
         # Distinct by organization for the same reason as active_organizations
         # above — one org should never count twice.
-        "on_trial": active_subs.filter(billing_cycle="Free Trial")
-        .values("organization")
-        .distinct()
-        .count(),
+        on_trial=Count(
+            "organization",
+            filter=not_rejected_active & Q(billing_cycle="Free Trial"),
+            distinct=True,
+        ),
+        # Includes Rejected orgs, whose subscription now displays (and, going
+        # forward, is actually stored) as "Cancelled" — see get_display_status().
+        cancelled=Count(
+            "id", filter=Q(status="Cancelled") | Q(organization__status="Rejected")
+        ),
+        cancelled_30_days=Count(
+            "id", filter=Q(status="Cancelled", updated_on__gte=thirty_days_ago)
+        ),
+        # past_due and expiring_soon_count were previously two separate
+        # queries running the exact same filter — now computed once.
+        expiring_soon=Count("id", filter=Q(status="Expiring Soon")),
+        totals_employees=Sum("employees"),
+        totals_monthly_revenue=Sum("monthly_revenue"),
+        new_this_month=Count("id", filter=Q(created_on__gte=month_start)),
+        cancelled_this_month=Count(
+            "id", filter=Q(status="Cancelled", updated_on__gte=month_start)
+        ),
+        cancelled_this_year=Count(
+            "id", filter=Q(status="Cancelled", updated_on__gte=year_start)
+        ),
+    )
+
+    summary = {
+        "total_subscriptions": agg["total_subscriptions"],
+        "monthly_revenue": agg["monthly_revenue"] or 0,
+        "monthly_revenue_change_pct": 0,
+        "active_organizations": agg["active_organizations"],
+        "active_organizations_change": agg["active_organizations_change"],
+        "total_employees": agg["total_employees"] or 0,
+        "total_employees_change": 0,
+        "on_trial": agg["on_trial"],
         "on_trial_convert_this_week": 0,
         # Built from latest_subs (one row per org, same as the table) rather
         # than all_subs — see the comment on latest_subs above for why a plain
         # distinct-organization count over all historical rows still overcounts.
+        # This is a different (subquery-based) queryset, so it stays a
+        # separate query from the combined aggregate above.
         "pending": latest_subs.filter(
             Q(status__in=["Pending Payment", "Pending Activation"])
             | Q(organization__status="Pending")
         ).count(),
-        # Includes Rejected orgs, whose subscription now displays (and, going
-        # forward, is actually stored) as "Cancelled" — see get_display_status().
-        "cancelled": all_subs.filter(
-            Q(status="Cancelled") | Q(organization__status="Rejected")
-        ).count(),
-        "cancelled_30_days": all_subs.filter(
-            status="Cancelled", updated_on__gte=thirty_days_ago
-        ).count(),
+        "cancelled": agg["cancelled"],
+        "cancelled_30_days": agg["cancelled_30_days"],
         "cancelled_30_days_change_pct": 0,
-        "past_due": all_subs.filter(status="Expiring Soon").count(),
-        "expiring_soon_count": all_subs.filter(status="Expiring Soon").count(),
+        "past_due": agg["expiring_soon"],
+        "expiring_soon_count": agg["expiring_soon"],
         "totals": {
-            "employees": all_subs.aggregate(total=Sum("employees"))["total"] or 0,
-            "monthly_revenue": all_subs.aggregate(total=Sum("monthly_revenue"))["total"]
-            or 0,
+            "employees": agg["totals_employees"] or 0,
+            "monthly_revenue": agg["totals_monthly_revenue"] or 0,
         },
     }
 
@@ -675,13 +703,9 @@ def get_subscriptions(request):
     ]
 
     plan_breakdown_totals = {
-        "new_this_month": all_subs.filter(created_on__gte=month_start).count(),
-        "cancelled_this_month": all_subs.filter(
-            status="Cancelled", updated_on__gte=month_start
-        ).count(),
-        "cancelled_this_year": all_subs.filter(
-            status="Cancelled", updated_on__gte=year_start
-        ).count(),
+        "new_this_month": agg["new_this_month"],
+        "cancelled_this_month": agg["cancelled_this_month"],
+        "cancelled_this_year": agg["cancelled_this_year"],
     }
 
     return Response(

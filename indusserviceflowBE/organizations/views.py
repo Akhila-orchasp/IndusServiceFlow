@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
-from django.db.models import Q, Prefetch
+from django.db.models import Q, Prefetch, Count
 from django.http import HttpResponse
 
 from rest_framework.decorators import api_view, permission_classes
@@ -38,18 +38,25 @@ from .dashboard_service import DashboardService
 def _with_latest_subscription(queryset):
     """
     Attaches each organization's subscriptions (newest first, matching
-    Subscription.Meta.ordering) as `prefetched_subscriptions`, so
-    OrganizationSerializer can read plan/payment info in one extra query
-    total instead of one query per organization.
+    Subscription.Meta.ordering) as `prefetched_subscriptions`, and each
+    organization's admin user as `prefetched_org_admin`, plus select_related
+    for category, so OrganizationSerializer can render a whole page of
+    organizations in a fixed, small number of queries instead of ~3 extra
+    queries (category, org admin, subscription) per organization.
     """
-    return queryset.prefetch_related(
+    return queryset.select_related("category").prefetch_related(
         Prefetch(
             "subscriptions",
             queryset=Subscription.objects.select_related("plan").order_by(
                 "-created_on"
             ),
             to_attr="prefetched_subscriptions",
-        )
+        ),
+        Prefetch(
+            "users",
+            queryset=User.objects.filter(role="ORG_ADMIN").order_by("date_joined"),
+            to_attr="prefetched_org_admin",
+        ),
     )
 
 
@@ -1392,13 +1399,14 @@ def get_organizations(request):
 
     organizations = organizations.order_by("-id")
 
+    # One combined query instead of 4 separate .count() calls.
     all_orgs = Organization.objects.filter(is_deleted=False)
-    counts = {
-        "total": all_orgs.count(),
-        "pending": all_orgs.filter(status__iexact="Pending").count(),
-        "active": all_orgs.filter(status__iexact="Active").count(),
-        "rejected": all_orgs.filter(status__iexact="Rejected").count(),
-    }
+    counts = all_orgs.aggregate(
+        total=Count("id"),
+        pending=Count("id", filter=Q(status__iexact="Pending")),
+        active=Count("id", filter=Q(status__iexact="Active")),
+        rejected=Count("id", filter=Q(status__iexact="Rejected")),
+    )
 
     page_param = request.query_params.get("page")
 

@@ -74,71 +74,73 @@ def _month_bounds(y, m):
 @permission_classes([IsAuthenticated])
 def dashboard(request):
 
-    active_orgs_qs = Organization.objects.filter(is_deleted=False)
+    months = _last_12_months()
+    now = timezone.now()
 
-    total_organizations = active_orgs_qs.count()
-
-    active_organizations = active_orgs_qs.filter(status__iexact="active").count()
-
-    pending_requests = active_orgs_qs.filter(status__iexact="pending").count()
-
-    monthly_revenue = (
-        Subscription.objects.filter(status__iexact="active").aggregate(
-            total=Sum("monthly_revenue")
-        )["total"]
-        or 0
+    # --- Single query: pull every field this view needs about organizations ---
+    # (previously: 1 count() per month in the loop below + several more counts,
+    # ~15 separate DB round trips just for organizations)
+    orgs_data = list(
+        Organization.objects.filter(is_deleted=False).values(
+            "created_on", "status", "category__category_name"
+        )
     )
 
-    months = _last_12_months()
+    total_organizations = len(orgs_data)
+    active_organizations = sum(
+        1 for o in orgs_data if (o["status"] or "").lower() == "active"
+    )
+    pending_requests = sum(
+        1 for o in orgs_data if (o["status"] or "").lower() == "pending"
+    )
+
     org_growth = []
     for y, m, label in months:
         start, end = _month_bounds(y, m)
-        count = active_orgs_qs.filter(created_on__gte=start, created_on__lt=end).count()
+        count = sum(1 for o in orgs_data if start <= o["created_on"] < end)
         org_growth.append({"month": label, "organizations": count})
 
-    now = timezone.now()
-    mrr_growth = []
-    for i in range(3, -1, -1):
-        week_end = now - timedelta(weeks=i)
-        mrr = (
-            Subscription.objects.filter(
-                status__iexact="active", created_on__lte=week_end
-            ).aggregate(total=Sum("monthly_revenue"))["total"]
-            or 0
-        )
-        tenants = active_orgs_qs.filter(created_on__lte=week_end).count()
-        mrr_growth.append({"week": f"W{4 - i}", "mrr": mrr, "tenants": tenants})
-
-    category_mix_qs = (
-        active_orgs_qs.values("category__category_name")
-        .annotate(count=Count("id"))
-        .order_by("-count")
-    )
+    category_counts = {}
+    for o in orgs_data:
+        cat = o["category__category_name"] or "Uncategorized"
+        category_counts[cat] = category_counts.get(cat, 0) + 1
     category_mix = [
-        {
-            "category": row["category__category_name"] or "Uncategorized",
-            "count": row["count"],
-        }
-        for row in category_mix_qs
+        {"category": cat, "count": count}
+        for cat, count in sorted(category_counts.items(), key=lambda x: -x[1])
     ]
 
-    plan_distribution_qs = (
-        Subscription.objects.filter(status__iexact="active")
-        .values("plan__plan_name")
-        .annotate(count=Count("id"))
-        .order_by("-count")
-    )
-    plan_distribution = [
-        {"plan": row["plan__plan_name"] or "Unknown", "count": row["count"]}
-        for row in plan_distribution_qs
-    ]
-
-    last_6_months = months[-6:]
-
+    # --- Single query: pull every subscription once, reused for every stat below ---
+    # (previously: 1 aggregate per week in the mrr loop + a separate plan_distribution
+    # query + this same all_subs query, ~12 more DB round trips)
     all_subs = list(
         Subscription.objects.select_related("plan")
         .order_by("organization_id", "created_on", "id")
     )
+    active_subs = [s for s in all_subs if (s.status or "").lower() == "active"]
+
+    monthly_revenue = sum((s.monthly_revenue or 0) for s in active_subs)
+
+    mrr_growth = []
+    for i in range(3, -1, -1):
+        week_end = now - timedelta(weeks=i)
+        mrr = sum(
+            (s.monthly_revenue or 0)
+            for s in active_subs
+            if s.created_on <= week_end
+        )
+        tenants = sum(1 for o in orgs_data if o["created_on"] <= week_end)
+        mrr_growth.append({"week": f"W{4 - i}", "mrr": mrr, "tenants": tenants})
+
+    plan_counts = {}
+    for s in active_subs:
+        name = s.plan.plan_name if s.plan else "Unknown"
+        plan_counts[name] = plan_counts.get(name, 0) + 1
+    plan_distribution = [
+        {"plan": name, "count": count}
+        for name, count in sorted(plan_counts.items(), key=lambda x: -x[1])
+    ]
+
+    last_6_months = months[-6:]
 
     sub_kind = {}
     previous_price_by_org = {}
