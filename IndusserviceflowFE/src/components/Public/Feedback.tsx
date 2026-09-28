@@ -122,11 +122,9 @@ const Feedback = () => {
 
         if (data.is_submitted) setSubmitted(true);
       } catch (err: unknown) {
-        const response = (err as { response?: { status?: number; data?: { message?: string } } })
-          ?.response;
-        const status = response?.status;
+        const status = err?.response?.status;
         const message =
-          response?.data?.message ||
+          err?.response?.data?.message ||
           (status === 410
             ? "This feedback link has expired."
             : "This feedback link is invalid.");

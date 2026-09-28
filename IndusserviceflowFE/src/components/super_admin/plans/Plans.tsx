@@ -349,7 +349,12 @@ const PlansPage: React.FC = () => {
           {/* Plan cards */}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(3, 1fr)", xl: "repeat(4, 1fr)" }, gap: 2.5, alignItems: "stretch" }}>
             {visiblePlans.map((plan) => {
-              const price = billingCycle === "monthly" ? plan.monthly_price : plan.annual_price;
+              const isAnnual = billingCycle === "annual";
+              // Yearly = monthly x 12, same as Plan.annual_total on the backend
+              // (what customers are actually charged), not the raw annual_price column.
+              const monthlyPrice = Number(plan.monthly_price);
+              const price = isAnnual ? monthlyPrice * 12 : monthlyPrice;
+              const perMonthEquivalent = Math.round(monthlyPrice);
               const isArchived = plan.status !== "Active";
               const iconColor = ICON_COLORS[plan.icon] ?? "#64748B";
 
@@ -431,13 +436,18 @@ const PlansPage: React.FC = () => {
                     </Typography>
                     {price > 0 && (
                       <Typography variant="body2" color="text.secondary">
-                        / month
+                        {isAnnual ? "/ year" : "/ month"}
                       </Typography>
                     )}
                   </Box>
                   {price === 0 && (
                     <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>
                       no payment method required
+                    </Typography>
+                  )}
+                  {isAnnual && price > 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>
+                      ≈ ₹{perMonthEquivalent.toLocaleString("en-IN")}/month, billed yearly
                     </Typography>
                   )}
 
